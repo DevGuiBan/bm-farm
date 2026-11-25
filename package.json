@@ -1,0 +1,38 @@
+{
+  "name": "bm-farm",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "local": "node dev/local.mjs",
+    "local:limpar": "node -e \"require('fs').rmSync('.local',{recursive:true,force:true})\"",
+    "e2e": "node dev/local.mjs e2e",
+    "verificar": "npm run typecheck && npm test && npm run e2e",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "criar-admin": "node --env-file=.env.local scripts/criar-admin.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
+    "lucide-react": "^1.79.0",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^26.6.7",
+    "@types/react": "^19.3.1",
+    "@types/react-dom": "^19.3.0",
+    "playwright-core": "^1.65.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "5.9",
+    "vitest": "^5.1.1"
+  }
+}
