@@ -10,7 +10,6 @@ import { popular } from "./dados.mjs";
 
 const MIGRATIONS = join(import.meta.dirname, "../supabase/migrations");
 export const CHAVE_SERVICO = "chave-de-servico-local";
-export const CODIGO = "123456";
 
 const BASE = `
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
@@ -119,19 +118,10 @@ export async function iniciar({ porta, pasta, quieto = false }) {
       return [200, pub(u)];
     }
     if (path === "logout") return [204];
-    if (path === "otp") {
-      if (!(await find("email", body.email))) return [422, { msg: "não existe" }];
-      log(`e-mail para ${body.email}: seu código de acesso é ${CODIGO}`);
-      return [200, {}];
-    }
     if (path === "verify") {
-      if (body.token_hash) {
-        const u = links.get(body.token_hash);
-        links.delete(body.token_hash);
-        return u ? [200, session(u)] : [403, { msg: "expirado" }];
-      }
-      const u = await find("email", body.email);
-      return u && body.token === CODIGO ? [200, session(u)] : [403, { msg: "código" }];
+      const u = links.get(body.token_hash);
+      links.delete(body.token_hash);
+      return u ? [200, session(u)] : [403, { msg: "expirado" }];
     }
     if (path.startsWith("admin/")) {
       if (who(req)[0] !== "service_role") return [403, { msg: "negado" }];

@@ -13,7 +13,7 @@ const TYPES: Record<string, { ext: string; magic: number[] }> = {
   "image/png": { ext: "png", magic: [0x89, 0x50, 0x4e, 0x47] },
 };
 const MAX = 10 * 1024 * 1024;
-const NO_ACCESS: Result = { error: "Sem acesso a este cliente." };
+const NO_ACCESS: Result = { error: "Sem acesso a esta BM." };
 
 /** RLS decide se a pessoa enxerga o cliente. */
 async function accessTo(client: string) {

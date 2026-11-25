@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { addNote, assignClient, createInvite, moveStage, recordSiteReply, reviewDocument, saveSite, toggleChecklist, updateClient } from "@/actions/clients";
+import { addNote, assignClient, moveStage, recordSiteReply, reviewDocument, saveSite, toggleChecklist, updateClient } from "@/actions/clients";
 import { ActionForm } from "@/components/form";
 import { Upload } from "@/components/upload";
-import { Deadline, Empty, PageHead, StatusBadge, Trail } from "@/components/ui";
+import { StageAge, Empty, PageHead, StatusBadge, Trail } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { activityDetail } from "@/lib/activity";
-import { bytes, cnpj, dateTime } from "@/lib/format";
+import { bytes, cnpj, dateTime, plural } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
-  ACTION_LABEL, DOC_LABEL, FLOW, PRIORITY_LABEL, STAGE_LABEL, type Activity, type Authorization, type ChecklistItem, type Client,
+  ACTION_LABEL, DOC_LABEL, FLOW, PORTFOLIO_LABEL, PRIORITY_LABEL, STAGE_LABEL, type Activity, type ChecklistItem, type Client,
   type ClientRow, type Doc, type Profile, type Site, type Stage,
 } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Cliente" };
+export const metadata: Metadata = { title: "BM" };
 const SITE_LABEL = { rascunho: "Rascunho", em_aprovacao: "Aguardando o cliente", aprovado: "Aprovado pelo cliente", ajustes: "Cliente pediu ajustes" };
 const Id = ({ id }: { id: string }) => <input type="hidden" name="client" value={id} />;
 
@@ -22,35 +22,36 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const db = await createClient();
-  const [client, overview, auth, docs, site, checklist, notes, feed, blockers, team] = await Promise.all([
+  const [client, overview, uses, docs, site, checklist, notes, feed, blockers, team] = await Promise.all([
     db.from("clients").select("*").eq("id", id).maybeSingle(),
     db.from("client_overview").select("*").eq("id", id).maybeSingle(),
-    db.from("authorizations").select("*").eq("client_id", id).order("signed_at", { ascending: false }),
+    db.rpc("cnpj_other_uses", { p_client: id }),
     db.from("documents").select("*").eq("client_id", id).order("uploaded_at", { ascending: false }),
     db.from("sites").select("*").eq("client_id", id).maybeSingle(),
     db.from("checklist_items").select("*").eq("client_id", id).order("position"),
     db.from("note_feed").select("*").eq("client_id", id).order("created_at", { ascending: false }),
     db.from("activity_feed").select("*").eq("client_id", id).order("created_at", { ascending: false }).limit(30),
     db.rpc("stage_blockers", { p_client: id }),
-    db.from("profiles").select("*").eq("active", true).order("full_name"),
+    db.from("profiles").select("*").eq("active", true).eq("role", "operador").order("full_name"),
   ]);
   if (!client.data || !overview.data) notFound();
   const c = client.data as Client, row = overview.data as ClientRow, st = site.data as Site | null;
   const closed = c.stage === "concluido" || c.stage === "cancelado";
   const missing = (blockers.data ?? []) as string[];
-  const current = auth.data?.[0] as Authorization | undefined;
+  const others = Number(uses.data ?? 0);
   const items = ((checklist.data ?? []) as ChecklistItem[]).filter((i) => i.stage === c.stage);
   const at = c.stage === "concluido" ? FLOW.length : FLOW.indexOf(c.stage as (typeof FLOW)[number]);
   const previous = FLOW.slice(0, Math.max(at, 0)) as readonly Stage[];
   const reg = c.registry;
   return (
     <>
-      <PageHead title={c.trade_name || c.legal_name} sub={`${c.legal_name}, CNPJ ${cnpj(c.cnpj)}`}><Deadline row={row} /></PageHead>
-      {c.stage !== "cancelado" && <div className="mb-6"><Trail stage={c.stage} hoursIn={row.hours_in_stage} sla={row.sla_hours} late={row.late} labels /></div>}
+      <PageHead title={c.trade_name || c.legal_name} sub={`${c.legal_name}, CNPJ ${cnpj(c.cnpj)}`}><StageAge row={row} /></PageHead>
+      {others > 0 && <p className="mb-5"><span className="badge badge-warn">CNPJ também em uso em {plural(others, "outra BM", "outras BMs")}</span></p>}
+      {c.stage !== "cancelado" && <div className="mb-6"><Trail stage={c.stage} labels /></div>}
       <div className="grid items-start gap-5 lg:grid-cols-[1.6fr_1fr]">
         <div className="grid min-w-0 gap-5">
           <section className="panel">
-            <h2 className="mb-3">{closed ? STAGE_LABEL[c.stage] : `Próximo passo em ${STAGE_LABEL[c.stage]}`}</h2>
+            <h2 className="mb-3">{closed ? (c.stage === "concluido" && c.portfolio === "existente" ? "Concluída, fora da meta" : STAGE_LABEL[c.stage]) : `Próximo passo em ${STAGE_LABEL[c.stage]}`}</h2>
             {!closed && (missing.length > 0
               ? <ul className="mb-4 list-disc space-y-1 pl-5">{missing.map((b) => <li key={b}>{b}</li>)}</ul>
               : <p className="mb-4">Tudo pronto para avançar.</p>)}
@@ -90,9 +91,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           </section>
 
           {st && <section className="panel">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2>Site em {c.domain ?? "domínio a declarar"}</h2><span className={`badge ${st.status === "aprovado" ? "badge-ok" : st.status === "ajustes" ? "badge-warn" : ""}`}>{SITE_LABEL[st.status]}</span></div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2>Site em {c.domain ?? "domínio a definir"}</h2><span className={`badge ${st.status === "aprovado" ? "badge-ok" : st.status === "ajustes" ? "badge-warn" : ""}`}>{SITE_LABEL[st.status]}</span></div>
             {st.client_note && <p className="mb-3">Cliente: {st.client_note}</p>}
-            {current?.status === "aprovado" && st.content.headline && <a className="btn btn-quiet mb-4" href={`/api/sites/${id}?previa=1`} target="_blank" rel="noreferrer">Ver prévia</a>}
+            {st.content.headline && <a className="btn btn-quiet mb-4" href={`/api/sites/${id}?previa=1`} target="_blank" rel="noreferrer">Ver prévia</a>}
             {c.stage === "site" && st.status === "em_aprovacao" && (
               <ActionForm action={recordSiteReply} className="mb-5 space-y-2"><Id id={id} />
                 <p>Envie a prévia ao cliente. Ao receber a resposta, anexe o print em Documentos e registre aqui.</p>
@@ -100,6 +101,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 <div className="flex flex-wrap gap-2"><button className="btn" name="decision" value="sim">Cliente aprovou</button><button className="btn btn-quiet" name="decision" value="nao">Cliente pediu ajustes</button></div></ActionForm>)}
             {c.stage === "site" ? (
               <ActionForm action={saveSite} className="grid gap-3 sm:grid-cols-2"><Id id={id} />
+                <label><span className="label">Domínio do site (do cliente ou da agência)</span><input className="input" name="domain" defaultValue={c.domain ?? ""} placeholder="empresa.com.br" /></label>
+                <label><span className="label">Telefone da empresa</span><input className="input" name="phone" type="tel" defaultValue={c.public_phone ?? ""} /></label>
                 <label className="sm:col-span-2"><span className="label">Título</span><input className="input" name="headline" defaultValue={st.content.headline} maxLength={160} /></label>
                 <label className="sm:col-span-2"><span className="label">Sobre a empresa</span><textarea className="input" rows={5} name="about" defaultValue={st.content.about} /></label>
                 <label className="sm:col-span-2"><span className="label">Serviços (um por linha)</span><textarea className="input" rows={4} name="services" defaultValue={st.content.services?.join("\n")} /></label>
@@ -121,32 +124,25 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
         <div className="grid min-w-0 gap-5">
           <section className="panel">
-            <h2 className="mb-3">Autorização do titular</h2>
-            {current ? <div className="mb-4 space-y-1"><StatusBadge status={current.status} /><p>{current.signer_name}, {current.signer_role === "socio" ? "sócio ou administrador" : "procurador"}</p>
-              <p className="text-sm text-soft">Assinada em {dateTime(current.signed_at)}</p>{current.review_note && <p className="text-sm">Observação: {current.review_note}</p>}</div>
-              : <p className="mb-4 text-soft">Ainda não assinada.</p>}
-            <ActionForm action={createInvite}><Id id={id} /><button className="btn btn-quiet">Gerar link de assinatura</button></ActionForm>
-            <p className="mt-2 text-sm text-soft">Envie ao titular pelo WhatsApp. Para assinar, ele confirma um código enviado para {c.contact_email}.</p>
-          </section>
-          <section className="panel">
             <h2 className="mb-3">Dados</h2>
-            <dl className="mb-4 space-y-2 text-sm">{([["Titular", c.contact_name], ["Sócios no cadastro", c.partners.join(", ") || "Não informados"], ["Atividade", reg.cnae], ["Endereço", [reg.endereco, reg.municipio, reg.uf, reg.cep].filter(Boolean).join(", ")], ["Telefone da empresa", c.public_phone]] as const).map(([k, v]) => <div key={k}><dt className="text-soft">{k}</dt><dd>{v || "Não informado"}</dd></div>)}</dl>
+            <dl className="mb-4 space-y-2 text-sm">{([["Titular", c.contact_name], ["Telefone do titular", c.contact_phone], ["Portfólio", PORTFOLIO_LABEL[c.portfolio]], ["Sócios no cadastro", c.partners.join(", ") || "Não informados"], ["Atividade", reg.cnae], ["Endereço", [reg.endereco, reg.municipio, reg.uf, reg.cep].filter(Boolean).join(", ")], ["Telefone da empresa", c.public_phone]] as const).map(([k, v]) => <div key={k}><dt className="text-soft">{k}</dt><dd>{v || "Não informado"}</dd></div>)}</dl>
             <details><summary className="link">Editar dados de trabalho</summary>
               <ActionForm action={updateClient} className="mt-3 space-y-3"><Id id={id} />
                 <label className="block"><span className="label">Nome fantasia</span><input className="input" name="trade_name" defaultValue={c.trade_name ?? ""} /></label>
                 <label className="block"><span className="label">Telefone do titular</span><input className="input" name="contact_phone" defaultValue={c.contact_phone ?? ""} /></label>
                 <label className="block"><span className="label">Prioridade</span><select className="input" name="priority" defaultValue={c.priority}>{Object.entries(PRIORITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+                <label className="block"><span className="label">Portfólio na Meta</span><select className="input" name="portfolio" defaultValue={c.portfolio}>{Object.entries(PORTFOLIO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
                 <button className="btn btn-quiet">Salvar dados</button></ActionForm></details>
           </section>
           <section className="panel">
             <h2 className="mb-3">Responsável</h2>
             {me.role === "admin" ? <ActionForm action={assignClient} className="flex flex-wrap gap-2"><Id id={id} />
-              <select className="input w-auto grow" name="operator" defaultValue={c.assigned_to ?? ""} aria-label="Responsável">{!c.assigned_to && <option value="">Escolha</option>}{((team.data ?? []) as Profile[]).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+              <select className="input w-auto grow" name="operator" defaultValue={c.assigned_to ?? ""} aria-label="Responsável">{!((team.data ?? []) as Profile[]).some((p) => p.id === c.assigned_to) && <option value="">Escolha</option>}{((team.data ?? []) as Profile[]).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
               <button className="btn btn-quiet">Trocar</button></ActionForm> : <p>{row.assigned_name ?? "Sem responsável"}</p>}
           </section>
           <section className="panel">
             <h2 className="mb-3">Histórico</h2>
-            <ul className="space-y-2.5 text-sm">{((feed.data ?? []) as Activity[]).map((a) => <li key={a.id}><b className="font-semibold">{a.actor_name ?? "Cliente"}</b> {ACTION_LABEL[a.action] ?? a.action}{activityDetail(a) && `: ${activityDetail(a)}`}<br /><span className="text-soft">{dateTime(a.created_at)}</span></li>)}</ul>
+            <ul className="space-y-2.5 text-sm">{((feed.data ?? []) as Activity[]).map((a) => <li key={a.id}><b className="font-semibold">{a.actor_name ?? "Sistema"}</b> {ACTION_LABEL[a.action] ?? a.action}{activityDetail(a) && `: ${activityDetail(a)}`}<br /><span className="text-soft">{dateTime(a.created_at)}</span></li>)}</ul>
           </section>
         </div>
       </div>

@@ -39,7 +39,7 @@ export const login = async (p, email, senha = SENHA) => {
 export const enter = async (email, senha) => {
   const p = await ctx();
   await login(p, email, senha);
-  await p.waitForURL("**/painel");
+  await p.waitForURL(/\/(painel|admin\/produtividade)$/);
   return p;
 };
 export const fim = async () => {

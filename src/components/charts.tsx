@@ -23,7 +23,7 @@ export function DailyBars({ data }: { data: { day: string; advances: number; com
           {data.map((d, i) => (
             <button key={d.day} type="button" className="flex min-w-0 flex-1 cursor-default items-end justify-center px-px"
               onMouseEnter={() => setAt(i)} onFocus={() => setAt(i)} onBlur={() => setAt(null)}
-              aria-label={`${dayMonth(d.day)}: ${plural(d.advances, "etapa", "etapas")}, ${plural(d.completed, "cliente concluído", "clientes concluídos")}`}>
+              aria-label={`${dayMonth(d.day)}: ${plural(d.advances, "etapa", "etapas")}, ${plural(d.completed, "BM criada", "BMs criadas")}`}>
               <span className={`w-full max-w-6 rounded-t-[4px] ${at === i ? "bg-petrol-dark" : "bg-petrol"}`}
                 style={{ height: `${(Number(d.advances) / top) * 100}%` }} />
             </button>
@@ -32,7 +32,7 @@ export function DailyBars({ data }: { data: { day: string; advances: number; com
         {cur && (
           <div className="pointer-events-none absolute -top-2 z-10 rounded-md border border-line bg-paper px-3 py-2 text-sm whitespace-nowrap"
             style={at! > data.length / 2 ? { right: `${(1 - at! / data.length) * 100}%` } : { left: `${((at! + 1) / data.length) * 100}%` }}>
-            <b>{dayMonth(cur.day)}</b><br />{plural(cur.advances, "etapa", "etapas")}<br />{plural(cur.completed, "cliente concluído", "clientes concluídos")}
+            <b>{dayMonth(cur.day)}</b><br />{plural(cur.advances, "etapa", "etapas")}<br />{plural(cur.completed, "BM criada", "BMs criadas")}
           </div>
         )}
       </div>
@@ -47,8 +47,8 @@ export function DailyBars({ data }: { data: { day: string; advances: number; com
   );
 }
 
-export function StageBars({ data }: { data: { stage: FlowStage; avg_hours: number | null; samples: number; sla_hours: number }[] }) {
-  const max = Math.max(...data.flatMap((d) => [Number(d.avg_hours ?? 0), Number(d.sla_hours)]), 1) * 1.05;
+export function StageBars({ data }: { data: { stage: FlowStage; avg_hours: number | null; samples: number }[] }) {
+  const max = Math.max(...data.map((d) => Number(d.avg_hours ?? 0)), 1);
   return (
     <div>
       <ul className="space-y-4">
@@ -56,16 +56,14 @@ export function StageBars({ data }: { data: { stage: FlowStage; avg_hours: numbe
           <li key={d.stage} title={`${plural(d.samples, "passagem", "passagens")} no período`}>
             <div className="mb-1 flex justify-between gap-3 text-sm">
               <span className="font-semibold">{STAGE_LABEL[d.stage]}</span>
-              <span className="text-soft">{hours(d.avg_hours)}, prazo de {hours(d.sla_hours)}</span>
+              <span className="text-soft">{hours(d.avg_hours)}</span>
             </div>
-            <div className="relative h-3">
+            <div className="h-3">
               <div className="h-full rounded-r-[4px] bg-petrol" style={{ width: `${(Number(d.avg_hours ?? 0) / max) * 100}%` }} />
-              <i className="absolute -inset-y-1 w-0.5 bg-ink ring-2 ring-paper" style={{ left: `${(d.sla_hours / max) * 100}%` }} />
             </div>
           </li>
         ))}
       </ul>
-      <p className="mt-4 flex items-center gap-2 text-sm text-soft"><i className="inline-block h-4 w-0.5 bg-ink" />Prazo da etapa</p>
     </div>
   );
 }

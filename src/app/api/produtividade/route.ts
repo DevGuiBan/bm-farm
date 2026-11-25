@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/auth";
-import { period } from "@/lib/format";
+import { percent, period } from "@/lib/format";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Metric } from "@/lib/types";
@@ -13,10 +13,10 @@ export async function GET(request: Request) {
   const { from, to } = period(Object.fromEntries(new URL(request.url).searchParams));
   const { data } = await (await createClient()).rpc("operator_metrics", { p_from: from, p_to: to });
   await adminClient().from("activity_log").insert({ actor_id: me.id, action: "relatorio_exportado", meta: { de: from, ate: to } });
-  const head = ["Operador", "Papel", "Etapas avançadas", "Clientes concluídos", "Concluídos no mês", "Meta mensal", "No prazo", "Total com prazo",
-    "Tempo médio (h)", "Devoluções", "Em andamento", "Em atraso", "Ações", "Dias ativos", "Última ação"];
-  const rows = ((data ?? []) as Metric[]).map((m) => [m.full_name, m.role, m.advances, m.completed, m.completed_month, m.monthly_goal, m.sla_ok,
-    m.sla_total, m.avg_hours === null ? "" : String(m.avg_hours).replace(".", ","), m.rework, m.open_now, m.late_now, m.actions, m.active_days, m.last_action]);
+  const head = ["Operador", "Papel", "Etapas avançadas", "BMs criadas", "BMs criadas no mês", "Meta mensal", "% da meta",
+    "Tempo médio (h)", "Devoluções", "Em andamento", "Ações", "Dias ativos", "Última ação"];
+  const rows = ((data ?? []) as Metric[]).filter((m) => m.role === "operador").map((m) => [m.full_name, m.role, m.advances, m.completed, m.completed_month, m.monthly_goal,
+    m.monthly_goal ? percent(m.completed_month, m.monthly_goal) : "", m.avg_hours === null ? "" : String(m.avg_hours).replace(".", ","), m.rework, m.open_now, m.actions, m.active_days, m.last_action]);
   return new Response("﻿" + [head, ...rows].map((r) => r.map(cell).join(";")).join("\r\n"), {
     headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="produtividade-${from}-a-${to}.csv"` },
   });

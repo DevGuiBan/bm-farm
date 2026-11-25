@@ -22,8 +22,6 @@ export async function inviteMember(_: Result, f: FormData): Promise<Result> {
   const p = member.safeParse({ full_name: s(f, "full_name"), email: s(f, "email").toLowerCase(), role: s(f, "role") });
   if (!p.success) return { error: p.error.issues[0].message };
   const db = adminClient();
-  const { data: taken } = await db.from("clients").select("id").eq("contact_email", p.data.email).limit(1);
-  if (taken?.length) return { error: "Este e-mail já pertence ao titular de um cliente." };
   const { data, error } = await db.auth.admin.generateLink({ type: "invite", email: p.data.email });
   if (error) return { error: "Este e-mail já tem acesso ou não pôde ser convidado." };
   const { error: e2 } = await db.from("profiles").insert({ id: data.user.id, ...p.data });
@@ -57,14 +55,9 @@ async function rpc(fn: string, args: Record<string, unknown>, ok: string): Promi
 }
 
 export const transferClients = async (_: Result, f: FormData) =>
-  rpc("transfer_clients", { p_from: s(f, "from"), p_to: s(f, "to") || null }, "Clientes transferidos.");
+  rpc("transfer_clients", { p_from: s(f, "from"), p_to: s(f, "to") || null }, "BMs transferidas.");
 
 export const updateMember = async (_: Result, f: FormData) =>
   rpc("update_member", {
     p_user: s(f, "user"), p_role: s(f, "role"), p_active: f.get("active") === "on", p_goal: Math.max(0, Number(s(f, "goal")) || 0),
   }, "Membro atualizado.");
-
-export const updateStage = async (_: Result, f: FormData) =>
-  rpc("update_stage_setting", {
-    p_stage: s(f, "stage"), p_sla: Number(s(f, "sla")) || 24, p_counts: f.get("counts") === "on",
-  }, "Prazo salvo.");

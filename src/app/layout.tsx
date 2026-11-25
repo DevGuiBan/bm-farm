@@ -6,7 +6,7 @@ const font = Schibsted_Grotesk({ subsets: ["latin"], variable: "--font-schibsted
 
 export const metadata: Metadata = {
   title: { default: "Trilho", template: "%s | Trilho" },
-  description: "Entrada de clientes e produtividade da equipe",
+  description: "Criação de BMs e produtividade da equipe",
   robots: { index: false, follow: false },
 };
 

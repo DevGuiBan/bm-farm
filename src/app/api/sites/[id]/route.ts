@@ -3,20 +3,19 @@ import { renderSite } from "@/lib/site-template";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-/** Exige autorização vigente; o download exige também conteúdo aprovado. A prévia abre isolada e sem baixar. */
+/** O download exige conteúdo aprovado pelo cliente. A prévia abre isolada e sem baixar. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await getProfile();
   if (!me) return new Response("Sem acesso", { status: 401 });
   const { id } = await params;
   const db = await createClient();
-  const [{ data: c }, { data: s }, { data: a }] = await Promise.all([
+  const [{ data: c }, { data: s }] = await Promise.all([
     db.from("clients").select("*").eq("id", id).maybeSingle(),
     db.from("sites").select("*").eq("client_id", id).maybeSingle(),
-    db.from("authorizations").select("id").eq("client_id", id).eq("status", "aprovado").limit(1),
   ]);
   if (!c || !s) return new Response("Não encontrado", { status: 404 });
   const preview = new URL(request.url).searchParams.has("previa");
-  if (!a?.length || (!preview && s.status !== "aprovado")) return new Response("O cliente precisa autorizar e aprovar o conteúdo", { status: 403 });
+  if (!preview && s.status !== "aprovado") return new Response("Falta a aprovação do conteúdo pelo cliente", { status: 403 });
   const address = [c.registry.endereco, c.registry.municipio, c.registry.uf].filter(Boolean).join(", ");
   const html = renderSite({ ...c, address }, s.content);
   if (preview) return new Response(html, {

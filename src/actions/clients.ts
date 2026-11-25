@@ -4,9 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth";
 import { clean, lookupCnpj, validCnpj } from "@/lib/cnpj";
-import { env } from "@/lib/env";
 import { friendly } from "@/lib/errors";
-import { hashToken, newToken } from "@/lib/portal-session";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "@/lib/types";
@@ -24,16 +22,17 @@ async function rpc(fn: string, args: Record<string, unknown>, ok: string): Promi
 const newClient = z.object({
   cnpj: z.string().refine(validCnpj, "CNPJ inválido. Confira os dígitos."),
   contact_name: z.string().min(3, "Informe o nome do titular."),
-  contact_email: z.email("Informe um e-mail válido do titular."),
   contact_phone: z.string().max(30),
   assigned_to: z.union([z.uuid(), z.literal("")]),
+  portfolio: z.enum(["novo", "existente"], "Diga se o portfólio é novo ou já existia."),
 });
 
 export async function createClientAction(_: Result, f: FormData): Promise<Result> {
   const me = await requireStaff();
   const p = newClient.safeParse({
-    cnpj: s(f, "cnpj"), contact_name: s(f, "contact_name"), contact_email: s(f, "contact_email").toLowerCase(),
+    cnpj: s(f, "cnpj"), contact_name: s(f, "contact_name"),
     contact_phone: s(f, "contact_phone"), assigned_to: s(f, "assigned_to"),
+    portfolio: s(f, "portfolio"),
   });
   if (!p.success) return { error: p.error.issues[0].message };
   if (f.get("contrato") !== "on") return { error: "Confirme que existe contrato com este cliente." };
@@ -50,8 +49,10 @@ export async function createClientAction(_: Result, f: FormData): Promise<Result
   const { data, error } = await adminClient().rpc("create_client", {
     p_actor: me.id, p_cnpj: clean(p.data.cnpj), p_legal_name: company.legalName, p_trade_name: company.tradeName,
     p_registry: company.registry, p_partners: company.partners, p_contact_name: p.data.contact_name,
-    p_contact_email: p.data.contact_email, p_contact_phone: p.data.contact_phone || null, p_assigned_to: p.data.assigned_to || null,
+    p_contact_phone: p.data.contact_phone || null, p_assigned_to: p.data.assigned_to || null, p_portfolio: p.data.portfolio,
+    p_reuse: s(f, "confirmar") === clean(p.data.cnpj), // a confirmação vale só para este CNPJ
   });
+  if (error?.code === "BM001") return { ask: { text: `${error.message} Confirmo que quero usar de novo.`, value: clean(p.data.cnpj) } };
   if (error) return { error: friendly(error) };
   redirect(`/clientes/${data}`);
 }
@@ -67,7 +68,7 @@ export const assignClient = async (_: Result, f: FormData) =>
 export const updateClient = async (_: Result, f: FormData) =>
   rpc("update_client", {
     p_client: s(f, "client"), p_trade_name: s(f, "trade_name"), p_contact_phone: s(f, "contact_phone"),
-    p_priority: Number(s(f, "priority")) || 2,
+    p_priority: Number(s(f, "priority")) || 2, p_portfolio: s(f, "portfolio") === "existente" ? "existente" : "novo",
   }, "Dados salvos.");
 
 export const toggleChecklist = async (_: Result, f: FormData) =>
@@ -88,11 +89,6 @@ export const recordSiteReply = async (_: Result, f: FormData) =>
     p_client: s(f, "client"), p_approve: s(f, "decision") === "sim", p_note: s(f, "note") || null,
   }, "Resposta registrada.");
 
-export const reviewAuthorization = async (_: Result, f: FormData) =>
-  rpc("review_authorization", {
-    p_auth: s(f, "auth"), p_approve: s(f, "decision") === "sim", p_note: s(f, "note") || null,
-  }, "Autorização analisada.");
-
 export async function saveSite(_: Result, f: FormData): Promise<Result> {
   const content = {
     headline: s(f, "headline").slice(0, 160), about: s(f, "about").slice(0, 4000), hours: s(f, "hours").slice(0, 120),
@@ -103,13 +99,7 @@ export async function saveSite(_: Result, f: FormData): Promise<Result> {
   if (submit && (!content.headline || !content.about || !content.services.length)) {
     return { error: "Preencha título, sobre e ao menos um serviço antes de enviar." };
   }
-  return rpc("save_site", { p_client: s(f, "client"), p_content: content, p_submit: submit },
+  const domain = s(f, "domain").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+  return rpc("save_site", { p_client: s(f, "client"), p_content: content, p_submit: submit, p_domain: domain, p_phone: s(f, "phone").slice(0, 30) },
     submit ? "Versão fechada. Envie a prévia ao cliente." : "Rascunho salvo.");
-}
-
-export async function createInvite(_: Result, f: FormData): Promise<Result> {
-  const token = newToken();
-  const r = await rpc("create_invite", { p_client: s(f, "client"), p_token_hash: hashToken(token) },
-    "Link gerado. Os anteriores deixaram de valer.");
-  return r.error ? r : { ...r, link: `${env.site}/portal/${token}` };
 }

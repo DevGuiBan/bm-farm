@@ -26,6 +26,9 @@ export function ActionForm({ action, children, className, reset, confirm }: {
     >
       <fieldset disabled={pending} className={`min-w-0 ${className ?? ""}`}>{children}</fieldset>
       {armed && <p role="alert" className="mt-2 text-sm font-semibold text-warn">{confirm}</p>}
+      {state.ask && (
+        <label role="alert" key={state.ask.value} className="mt-3 flex items-start gap-2.5 font-semibold text-warn">
+          <input type="checkbox" name="confirmar" value={state.ask.value} className="mt-1 size-4" /><span>{state.ask.text}</span></label>)}
       {state.error && <p role="alert" className="mt-2 text-sm font-semibold text-bad">{state.error}</p>}
       {state.ok && <p role="status" className="mt-2 text-sm font-semibold text-ok">{state.ok}</p>}
       {state.link && <CopyLink value={state.link} />}

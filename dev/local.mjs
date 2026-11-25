@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { EQUIPE, SENHA } from "./dados.mjs";
-import { CHAVE_SERVICO, CODIGO, iniciar } from "./emulador.mjs";
+import { CHAVE_SERVICO, iniciar } from "./emulador.mjs";
 
 const RAIZ = join(import.meta.dirname, "..");
 const NEXT = join(RAIZ, "node_modules/next/dist/bin/next");
@@ -14,7 +14,7 @@ const site = `http://localhost:${portaApp}`;
 const env = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${portaDb}`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "chave-publica-local",
-  SUPABASE_SECRET_KEY: CHAVE_SERVICO, PORTAL_SECRET: "segredo-local-somente-para-desenvolvimento", NEXT_PUBLIC_SITE_URL: site,
+  SUPABASE_SECRET_KEY: CHAVE_SERVICO, NEXT_PUBLIC_SITE_URL: site,
   ...(e2e && { NEXT_DIST_DIR: ".next-e2e", E2E_URL: site }),
 };
 const abrir = (args, opts = {}) => spawn(process.execPath, args, { cwd: RAIZ, env, stdio: "inherit", ...opts });
@@ -31,7 +31,7 @@ try {
 if (!e2e) {
   console.log(`\nAmbiente local em ${site} (senha de todos: ${SENHA})`);
   for (const [nome, email, papel] of EQUIPE) console.log(`  ${papel.padEnd(9)} ${email.padEnd(20)} ${nome}`);
-  console.log(`Código de assinatura do titular: ${CODIGO}\nNenhum e-mail é enviado. Ctrl+C encerra.\n`);
+  console.log("Nenhum e-mail é enviado. Ctrl+C encerra.\n");
   const app = abrir([NEXT, "dev", "-H", "localhost", "-p", String(portaApp)]);
   process.on("SIGINT", () => app.kill());
   const code = await esperar(app);

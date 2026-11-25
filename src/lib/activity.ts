@@ -1,4 +1,4 @@
-import { DOC_LABEL, STAGE_LABEL, type Activity, type DocKind, type Stage } from "@/lib/types";
+import { DOC_LABEL, PORTFOLIO_LABEL, STAGE_LABEL, type Activity, type DocKind, type Portfolio, type Stage } from "@/lib/types";
 
 /** Resumo legível do que mudou em um registro de atividade. */
 export function activityDetail({ action, meta: m }: Pick<Activity, "action" | "meta">): string {
@@ -16,7 +16,8 @@ export function activityDetail({ action, meta: m }: Pick<Activity, "action" | "m
   if (m.documento) parts.push(DOC_LABEL[m.documento as DocKind] ?? String(m.documento));
   if (m.arquivo) parts.push(String(m.arquivo));
   if (m.item) parts.push(String(m.item));
-  if (m.signatario) parts.push(`signatário ${m.signatario}`);
+  if (m.portfolio) parts.push(PORTFOLIO_LABEL[m.portfolio as Portfolio] ?? String(m.portfolio));
+  if (m.outras) parts.push(Number(m.outras) === 1 ? "em uso em outra BM" : `em uso em outras ${m.outras} BMs`);
   if (m.motivo) parts.push(`motivo: ${m.motivo}`);
   return parts.join(", ");
 }

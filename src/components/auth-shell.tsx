@@ -4,7 +4,7 @@ export function AuthShell({ title, children }: { title: string; children: React.
       <div className="hidden flex-col justify-between bg-petrol-dark p-12 text-white lg:flex">
         <span className="text-xl font-bold tracking-tight">Trilho</span>
         <div>
-          <p className="max-w-[16ch] text-5xl leading-[1.05] font-bold tracking-tight">Cada cliente em uma etapa, cada etapa com prazo.</p>
+          <p className="max-w-[16ch] text-5xl leading-[1.05] font-bold tracking-tight">Cada BM em uma etapa, cada pessoa com sua meta.</p>
           <div className="mt-10 flex gap-1.5" aria-hidden>
             <i className="h-4 flex-1 rounded-[3px] bg-white" /><i className="h-4 flex-1 rounded-[3px] bg-white" />
             <i className="h-4 flex-1 overflow-hidden rounded-[3px] bg-white/25"><b className="block h-full w-3/5 bg-white" /></i>
